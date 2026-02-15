@@ -1,10 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useSCORModel } from '@/hooks/useSCORModel'
 import { useEvaluationStore } from '@/hooks/useEvaluationStore'
 import { calculateAggregatedResults } from '@/lib/calculations'
-import { ArrowLeft, Download } from 'lucide-react'
+import { ArrowLeft, Download, FileText } from 'lucide-react'
 import {
   RadarChart,
   PolarGrid,
@@ -19,9 +19,12 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  Cell
+  Cell,
+  LabelList
 } from 'recharts'
 import { getColorByLevel, getLevelWithLabel, getLevelLabel } from '@/lib/utils'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 
 interface ResultsProps {
   onBack: () => void
@@ -31,6 +34,7 @@ interface ResultsProps {
 export default function Results({ onBack, onHome }: ResultsProps) {
   const { model, loading } = useSCORModel()
   const { responses } = useEvaluationStore()
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false)
 
   const results = useMemo(() => {
     if (!model) return null
@@ -138,6 +142,92 @@ export default function Results({ onBack, onHome }: ResultsProps) {
     a.click()
   }
 
+  const exportPDF = async () => {
+    setIsGeneratingPDF(true)
+    try {
+      const pdf = new jsPDF('p', 'mm', 'a4')
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      let yOffset = 20
+
+      // Title
+      pdf.setFontSize(20)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('SCOR DS Maturity Model - Resultados', pageWidth / 2, yOffset, { align: 'center' })
+      yOffset += 10
+
+      // Date
+      pdf.setFontSize(10)
+      pdf.setFont('helvetica', 'normal')
+      pdf.text(`Fecha: ${new Date().toLocaleDateString('es-ES')}`, pageWidth / 2, yOffset, { align: 'center' })
+      yOffset += 15
+
+      // Summary
+      pdf.setFontSize(14)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('Resumen General', 15, yOffset)
+      yOffset += 8
+
+      pdf.setFontSize(10)
+      pdf.setFont('helvetica', 'normal')
+      pdf.text(`Nivel Promedio: ${results.overall.averageLevel.toFixed(2)} / 5.0`, 15, yOffset)
+      yOffset += 6
+      pdf.text(`Completado: ${results.overall.completionRate.toFixed(1)}% (${results.overall.evaluatedCount}/${results.overall.totalMicroprocesses})`, 15, yOffset)
+      yOffset += 10
+
+      // Capture and add charts
+      const charts = document.querySelectorAll('.recharts-wrapper')
+
+      for (let i = 0; i < Math.min(charts.length, 4); i++) {
+        const chart = charts[i] as HTMLElement
+
+        if (yOffset > pageHeight - 80) {
+          pdf.addPage()
+          yOffset = 20
+        }
+
+        const canvas = await html2canvas(chart, {
+          scale: 2,
+          backgroundColor: '#ffffff',
+          logging: false
+        })
+
+        const imgData = canvas.toDataURL('image/png')
+        const imgWidth = pageWidth - 30
+        const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+        pdf.addImage(imgData, 'PNG', 15, yOffset, imgWidth, imgHeight)
+        yOffset += imgHeight + 10
+      }
+
+      // Distribution table
+      if (yOffset > pageHeight - 60) {
+        pdf.addPage()
+        yOffset = 20
+      }
+
+      pdf.setFontSize(12)
+      pdf.setFont('helvetica', 'bold')
+      pdf.text('Distribución de Niveles', 15, yOffset)
+      yOffset += 8
+
+      pdf.setFontSize(10)
+      pdf.setFont('helvetica', 'normal')
+      ;([1, 2, 3, 4, 5] as const).forEach((level) => {
+        pdf.text(`Nivel ${level}: ${results.distribution[level] || 0} microprocesos`, 15, yOffset)
+        yOffset += 6
+      })
+
+      // Save PDF
+      pdf.save(`scor-evaluation-${new Date().toISOString().split('T')[0]}.pdf`)
+    } catch (error) {
+      console.error('Error generando PDF:', error)
+      alert('Error al generar el PDF. Por favor, intenta de nuevo.')
+    } finally {
+      setIsGeneratingPDF(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -152,6 +242,14 @@ export default function Results({ onBack, onHome }: ResultsProps) {
               <Button variant="outline" onClick={exportJSON}>
                 <Download className="w-4 h-4 mr-2" />
                 Exportar JSON
+              </Button>
+              <Button
+                variant="outline"
+                onClick={exportPDF}
+                disabled={isGeneratingPDF}
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                {isGeneratingPDF ? 'Generando PDF...' : 'Exportar PDF'}
               </Button>
               <Button onClick={onHome}>Inicio</Button>
             </div>
@@ -283,6 +381,7 @@ export default function Results({ onBack, onHome }: ResultsProps) {
                   {componentData.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={getColorByLevel(entry.level)} />
                   ))}
+                  <LabelList dataKey="level" position="right" formatter={(value: number) => value.toFixed(2)} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -311,6 +410,7 @@ export default function Results({ onBack, onHome }: ResultsProps) {
                     {capacities.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={getColorByLevel(entry.level)} />
                     ))}
+                    <LabelList dataKey="level" position="right" formatter={(value: number) => value.toFixed(2)} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
