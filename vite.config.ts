@@ -11,7 +11,7 @@ export default defineConfig({
     },
   },
   // Para GitHub Pages: usa /nombre-repo/ o cambia a '/' si es tu sitio principal
-  base: process.env.NODE_ENV === 'production' ? '/MadurityModel/' : '/',
+  base: process.env.NODE_ENV === 'production' ? '/MadurityModelSCOR/' : '/',
   build: {
     outDir: 'dist',
     sourcemap: false,
