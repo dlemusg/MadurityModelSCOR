@@ -13,15 +13,14 @@
       "componentes": [
         {
           "codigo": "P1",
-          "nombre": "Plan Component 1",
+          "nombre": "Plan Supply Chain",
           "microprocesos": [
             {
               "id": "P1.1",
-              "nombre": "Plan Process 1.1",
+              "nombre": "Capture External Market Signals",
               "descripcion": "Identificación y análisis de requerimientos de la cadena de suministro",
               "capacidades": [
-                "Demand Planning",
-                "Strategic Planning"
+                "Inteligencia de Mercado Anticipativa"
               ],
               "niveles": {
                 "1": "Procesos informales y ad-hoc. Respuesta reactiva a eventos. Documentación limitada o inexistente. Ejecución manual sin estándares definidos. Alta dependencia de conocimiento individual.",
