@@ -7,7 +7,7 @@ export function useSCORModel() {
   const [error, setError] = useState<Error | null>(null)
 
   useEffect(() => {
-    fetch('/scor-model.json')
+    fetch(`${import.meta.env.BASE_URL}scor-model.json`)
       .then(res => {
         if (!res.ok) throw new Error('Failed to load SCOR model')
         return res.json()
