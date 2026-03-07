@@ -9,33 +9,7 @@ export function calculateAggregatedResults(
   const evaluatedCount = Object.keys(responses).length;
   const completionRate = (evaluatedCount / totalMicroprocesses) * 100;
 
-  // Calculate overall average
-  const levels = Object.values(responses).map(r => r.level);
-  const averageLevel = levels.length > 0
-    ? levels.reduce((a, b) => a + b, 0) / levels.length
-    : 0;
-
-  // Calculate by macroprocess
-  const byMacroprocess: Record<string, number> = {};
-  scorModel.macroprocesos.forEach(macro => {
-    const microIds: string[] = [];
-    macro.componentes.forEach(comp => {
-      comp.microprocesos.forEach(micro => {
-        microIds.push(micro.id);
-      });
-    });
-
-    const macroResponses = microIds
-      .map(id => responses[id])
-      .filter(Boolean);
-
-    if (macroResponses.length > 0) {
-      byMacroprocess[macro.macro] =
-        macroResponses.reduce((sum, r) => sum + r.level, 0) / macroResponses.length;
-    }
-  });
-
-  // Calculate by capacity (a microprocess can have multiple capacities)
+  // Nivel 2: NMcap = Σ NMi / n microprocesos de la capacidad
   const byCapacity: Record<string, number> = {};
   const capacityGroups: Record<string, string[]> = {};
 
@@ -62,6 +36,32 @@ export function calculateAggregatedResults(
         capacityResponses.reduce((sum, r) => sum + r.level, 0) / capacityResponses.length;
     }
   });
+
+  // Nivel 3: NMproc = Σ NMcap / n capacidades del proceso
+  const byMacroprocess: Record<string, number> = {};
+  scorModel.macroprocesos.forEach(macro => {
+    const capacidadesInMacro = new Set<string>();
+    macro.componentes.forEach(comp => {
+      comp.microprocesos.forEach(micro => {
+        micro.capacidades.forEach(cap => capacidadesInMacro.add(cap));
+      });
+    });
+
+    const nmcapValues = Array.from(capacidadesInMacro)
+      .map(cap => byCapacity[cap])
+      .filter((v): v is number => v !== undefined);
+
+    if (nmcapValues.length > 0) {
+      byMacroprocess[macro.macro] =
+        nmcapValues.reduce((sum, v) => sum + v, 0) / nmcapValues.length;
+    }
+  });
+
+  // Nivel 4: NMglobal = Σ NMproc / 7
+  const nmProcValues = Object.values(byMacroprocess);
+  const averageLevel = nmProcValues.length > 0
+    ? nmProcValues.reduce((a, b) => a + b, 0) / nmProcValues.length
+    : 0;
 
   // Calculate by component
   const byComponent: Record<string, number> = {};
